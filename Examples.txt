@@ -1,0 +1,359 @@
+Don't Stop (A little project for a gamejam):
+
+Example:
+https://gyazo.com/c19ca80b4cd57815fd9ae8545dfb535b
+
+DataStore:
+
+local DataStoreService = game:GetService("DataStoreService")
+local DataStore = DataStoreService:GetDataStore("playerStore")
+
+local Player = game:GetService("Players")
+
+local function playerJoined(player)
+	local Leaderstats = Instance.new("Folder")
+	Leaderstats.Name = "leaderstats"
+
+	local Coins = Instance.new("IntValue")
+	Coins.Name = "Coins"
+	Coins.Value = 0	
+	
+	local data = DataStore:GetAsync("Player_"..player.UserId)
+	
+	local success, ret = pcall(DataStore.GetAsync, DataStore, "Player_"..player.UserId)
+	
+	if success then
+		Coins.Value = ret or 0
+		
+		Coins.Parent = Leaderstats
+		Leaderstats.Parent = player
+	else
+		print("There was an error! "..ret)
+	end
+end
+
+local function playerLeft(player)
+	local leaderStats = player:FindFirstChild("leaderstats")
+	
+	if leaderStats then
+		local coinsValue = leaderStats.Coins.Value
+		local success, ret = pcall(DataStore.SetAsync, DataStore, "Player_"..player.UserId, coinsValue)
+		
+		if success then
+			print("Saved successfully!")
+		else
+			print("There was an error! "..ret)
+		end
+	end
+end
+
+Player.PlayerAdded:Connect(playerJoined)
+Player.PlayerRemoving:Connect(playerLeft)
+
+MainScript:
+
+local Events = game.ReplicatedStorage.Events
+
+local t = game.ReplicatedStorage:WaitForChild("Time")
+local n = nil
+
+Events:WaitForChild("Start").OnServerEvent:Connect(function(player)
+	Events:WaitForChild("Start"):FireClient(player)
+	local function startGame()
+		n = true
+		
+		local spawner = game.Workspace.Floor
+		local gem = game.ServerStorage.PartCheck
+		local r = 50
+		
+		local gemclone = gem:Clone()
+		local x,z = spawner.Position.X,spawner.Position.Z
+		x,z = math.random(x - r,x + r),math.random(z - r,z + r)
+		local pos = Vector3.new(x,spawner.Position.Y,z)
+		gemclone.Parent = workspace
+		gemclone.Position = pos
+		
+		local function partTouched(player)
+			player.leaderstats.Coins.Value = player.leaderstats.Coins.Value + 1
+			gemclone = gem:Clone()
+			wait(0.2)
+			game.ReplicatedStorage.Time.Value = game.ReplicatedStorage.Time.Value + 4
+			local x,z = spawner.Position.X,spawner.Position.Z
+			x,z = math.random(x - r,x + r),math.random(z - r,z + r)
+			local pos = Vector3.new(x,spawner.Position.Y,z)
+			gemclone.Parent = workspace
+			gemclone.Position = pos
+		end
+		
+		Events:WaitForChild("PartTouched").OnServerEvent:Connect(partTouched)
+		
+		t.Value = 100
+		
+		while n == true do 
+			wait(1)
+			t.Value = t.Value - 1
+			
+			if t.Value == 0 then
+				n = false
+				
+				wait(0.1)
+				
+				local delPart = game.Workspace:WaitForChild("PartCheck")
+				delPart:Destroy()
+				
+				wait(0.1)
+
+				player:LoadCharacter()
+			end
+		end
+	end
+	startGame()
+end)
+
+PlayButton:
+
+local GUI = script.Parent.Parent
+
+local StartEvent = game.ReplicatedStorage.Events.Start
+
+script.Parent.MouseButton1Click:Connect(function()
+	game.StarterGui:WaitForChild("TimeGui").Enabled = true
+	StartEvent:FireServer()
+	GUI:Destroy()
+end)
+
+Zombie Legacy (A game I wanted to finish but never did):
+
+Example:
+
+https://www.youtube.com/watch?v=LTTvH3Fg-qU&ab_channel=pally
+
+DataStore:
+
+local DataStoreService = game:GetService("DataStoreService")
+local playerData = DataStoreService:GetDataStore("PlayerData")
+
+local function onPlayerJoin(player)
+	local leaderstats = Instance.new("Folder")
+	leaderstats.Name = "leaderstats"
+	leaderstats.Parent = player
+
+	local coins = Instance.new("IntValue")
+	coins.Name = "Coins"
+	coins.Value = 0
+	coins.Parent = leaderstats
+
+	local level = Instance.new("IntValue")
+	level.Name = "Level"
+	level.Value = 0
+	level.Parent = leaderstats
+	
+	local xp = Instance.new("IntValue")
+	xp.Name = "Experience"
+	xp.Value = 0
+	xp.Parent = leaderstats
+	
+	local playerUserId = "Player_" .. player.UserId
+	local data = playerData:GetAsync(playerUserId)
+	if data then
+		coins.Value = data['Coins']
+		level.Value = data['Level']
+		xp.Value = data['Experience']
+	else
+		coins.Value = 0
+		level.Value = 0
+		xp.Value = 0
+	end
+	
+	local expToLevelUp
+	local expForPreviousLevel = 0
+
+	while wait() do
+		if level.Value < 1 then
+			expToLevelUp = 100
+		else 
+			expToLevelUp =  math.floor(level.Value ^ 1.3) * 200 + math.floor(level.Value ^ 4)
+		end
+		
+		if xp.Value >= expToLevelUp then
+			level.Value = level.Value + 1
+			game.ReplicatedStorage.Clones.Value = game.ReplicatedStorage.Clones.Value + 2
+		end
+		
+		expForPreviousLevel = math.floor((level.Value - 1) ^ 1.3) * 200 + math.floor((level.Value - 1) ^ 4)
+		
+		local expDifference = expToLevelUp - expForPreviousLevel
+		local expDifference2 = xp.Value - expForPreviousLevel
+		
+	end
+end
+
+local function create_table(player)
+
+	local player_stats = {}
+	for _, stat in pairs(player.leaderstats:GetChildren()) do
+		player_stats[stat.Name] = stat.Value
+	end
+	return player_stats
+end
+
+local function onPlayerExit(player)
+	local player_stats = create_table(player)
+	local success, err = pcall(function()
+		local playerUserId = "Player_" .. player.UserId
+		playerData:SetAsync(playerUserId, player_stats)
+	end)
+
+	if not success then
+		warn('Could not save data!')
+	end
+end
+
+game.Players.PlayerAdded:Connect(onPlayerJoin)
+game.Players.PlayerRemoving:Connect(onPlayerExit)
+
+EnemyHit:
+
+local RS = game:GetService("ReplicatedStorage")
+local Events = RS.RemoteEvents
+local HitEvent = Events.EnemyHitEvent
+
+HitEvent.OnServerEvent:Connect(function(Player, Hit, Dmg)
+	local Character = Player.Character
+	local Enemy = Hit:FindFirstChildOfClass("Humanoid")
+	Enemy:TakeDamage(Dmg)
+	if Enemy.Health <= 0 then
+		local creator = Instance.new("ObjectValue")
+		creator.Name = "creator"
+		creator.Value = Character
+		creator.Parent = Enemy
+	end
+end)
+
+MainScript:
+
+-- Variables
+local playerSpawn = game.Workspace.Graveyard:FindFirstChild("Spawn")
+local MobSpawns = game.Workspace.Graveyard.MobSpawns:GetChildren()
+local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+local RF = game:GetService("ReplicatedFirst")
+local SSS = game:GetService("ServerScriptService")
+local SS = game:GetService("ServerStorage")
+local RemoteEvents = RS.RemoteEvents
+local StartEvent = RemoteEvents.Starting
+local Spawned = nil
+local zombies = RS.ZombiesAlive
+local s = true
+
+-- Spawning Player & Mobs
+StartEvent.OnServerEvent:Connect(function(Player)
+	wait(0.2)
+	local Char = Player.Character
+	Char.HumanoidRootPart.CFrame = playerSpawn.CFrame
+	Spawned = true
+	wait(0.2)
+	if Spawned == true then
+		game.ServerStorage.ClassicSword.Parent = Player.Backpack
+	end
+	wait(0.3)
+	if Spawned == true then
+		while s == true do
+			local MobSpawn = MobSpawns[math.random(1, #MobSpawns)]
+			wait(1)
+			local clone = game.ServerStorage.Zombie:Clone()
+			wait(0.2)
+			clone.HumanoidRootPart.CFrame = MobSpawn.CFrame
+			clone.Parent = workspace.Zombies
+			local count = 0
+			for _,v in pairs(workspace.Zombies:GetChildren()) do
+				count = count + 1
+			end
+			zombies.Value = count
+			wait(0.1)
+			RS.Clones.Value = RS.Clones.Value - 1
+			if RS.Clones.Value == 0 then
+				s = false
+			end
+		end
+	end
+end)
+
+CamScript:
+
+local player = game.Players.LocalPlayer
+local char = player.CharacterAdded
+local mouse = player:GetMouse()
+local cam = game.Workspace.CurrentCamera
+
+game:GetService('StarterGui'):SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+
+local defaultCFrame = cam.CFrame
+local view = 90
+local blur = game.Lighting.Blur
+
+blur.Size = 10
+
+function updateCam()
+	cam.CFrame = game.Workspace.Model.Camera.CFrame
+end
+
+game:GetService("RunService").RenderStepped:Connect(updateCam)
+
+script.Parent.MainGui.Frame.Play.MouseButton1Click:Connect(function()
+	wait(1)
+	blur.Size = 0
+	script:Destroy()
+end)
+
+PlayButton:
+
+repeat wait() until game:IsLoaded()
+
+-- Variables
+local Play = script.Parent
+local RemoteEvents = game.ReplicatedStorage.RemoteEvents
+local StartEvent = RemoteEvents.Starting
+local Player = game.Players.LocalPlayer
+wait(1.2)
+Player.Character.Head.Anchored = true
+
+-- Spawning Player
+Play.MouseButton1Click:Connect(function()
+	script.Parent.Parent:TweenPosition(UDim2.new(-0.5, 0, 0.2, 0), Enum.EasingDirection.InOut, Enum.EasingStyle.Sine, nil, 2)
+	StartEvent:FireServer(Player)
+	Player.Character.Head.Anchored = false
+end)
+
+CamScript:
+
+local cam = workspace.CurrentCamera
+local char = script.Parent
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+cam.CameraType = Enum.CameraType.Scriptable
+
+local cameraPart = Instance.new("Part")
+cameraPart.Transparency = 1
+cameraPart.CanCollide = false
+cameraPart.Parent = workspace
+
+cameraPart.CFrame = CFrame.new(hrp.Position + Vector3.new(0, 20, 0), hrp.Position)
+
+local bp = Instance.new("BodyPosition")
+bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+bp.Parent = cameraPart
+
+game:GetService("RunService").RenderStepped:Connect(function()
+	bp.Position = hrp.Position + Vector3.new(0,20,0)
+	cam.CFrame = cameraPart.CFrame
+end)
+
+local plr = game.Players.LocalPlayer
+    repeat wait() until plr.Character
+local chr = plr.Character
+ 
+chr:WaitForChild("Humanoid").Changed:connect(function()
+	    chr.Humanoid.Jump = false
+end)
+
